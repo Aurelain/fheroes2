@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "serialize.h"
+#include <SDL_surface.h>
 
 namespace fheroes2
 {
@@ -57,6 +58,7 @@ namespace fheroes2
         std::map<std::string, std::pair<std::vector<uint8_t>, bool>> _externals;
         bool collectExternals( const std::string & aggFileName );
         std::vector<uint8_t> spawnIcnFromDir( const std::string & dirPath );
+        std::vector<uint8_t> getPixelsFromSurface( SDL_Surface * surface );
     };
 
     struct ICNHeader

@@ -28,6 +28,8 @@
 #include <logging.h>
 #include <system.h>
 #include <tools.h>
+#include <SDL_surface.h>
+#include <SDL2/SDL_image.h>
 
 namespace fheroes2
 {
@@ -124,14 +126,112 @@ namespace fheroes2
 
     std::vector<uint8_t> AGGFile::spawnIcnFromDir( const std::string & dirPath )
     {
-        COUT( dirPath );
-        return std::vector<uint8_t>();
-        /*
-        const std::string & filePath = System::concatPath( dirPath, "heroes.icn" );
-        std::ifstream instream( filePath, std::ios::in | std::ios::binary );
-        std::vector<uint8_t> v( ( std::istreambuf_iterator<char>( instream ) ), std::istreambuf_iterator<char>() );
-        return v;
-        */
+        std::vector<uint8_t> result;
+
+        ListFiles pngFiles;
+        pngFiles.ReadDir( dirPath, "png", false );
+        if ( pngFiles.empty() ) {
+            return {};
+        }
+       
+        const uint16_t count = static_cast<uint16_t>(pngFiles.size());
+        const size_t slotHeaderSize = 13;
+        uint32_t currentOffset = 0;
+
+        for ( const std::string & pngFile : pngFiles ) {
+            COUT( "pngFile:" << pngFile );
+
+            SDL_Surface * surface = IMG_Load( pngFile.c_str() );
+            if ( surface == nullptr ) {
+                return {};
+            }
+
+            const uint16_t width = static_cast<uint16_t>( surface->w );
+            const uint16_t height = static_cast<uint16_t>( surface->h );
+            const uint32_t numPixels = width * height * 4;
+            const uint32_t pixelDataStartsAt = currentOffset + slotHeaderSize;
+            
+            // Build slot header
+            StreamBuf slotHeader( slotHeaderSize );
+            slotHeader.putLE16( 0 ); // TODO: offsetX
+            slotHeader.putLE16( 0 ); // TODO: offsetY
+            slotHeader.putLE16( width );
+            slotHeader.putLE16( height );
+            slotHeader.put( 0 ); // animation frames
+            slotHeader.putLE32( pixelDataStartsAt ); // offsetData
+            
+            
+
+            // Append the slot header
+            const std::vector<uint8_t> slotHeaderRaw = slotHeader.getRaw();
+            result.insert( result.end(), slotHeaderRaw.begin(), slotHeaderRaw.end() );
+
+            result.insert( result.end(), 0xAB );
+            result.insert( result.end(), 0xCD );
+            result.insert( result.end(), 0xEF );
+
+
+            // Append the slot pixels
+            const std::vector<uint8_t> pixels = AGGFile::getPixelsFromSurface( surface );
+            result.insert( result.end(), pixels.begin(), pixels.end() );
+
+            currentOffset = static_cast<uint32_t>( result.size() );
+        }
+
+        // Build icon header
+        StreamBuf iconHeader( 6 ); // 2 bytes (count) + 4 bytes (size)
+        iconHeader.putLE16( count ); // how many slots we have
+        iconHeader.putLE32( static_cast<uint32_t>(result.size()) ); // total size of the slots
+        
+        // Append the slot header
+        const std::vector<uint8_t> iconHeaderRaw = iconHeader.getRaw();
+        result.insert( result.begin(), iconHeaderRaw.begin(), iconHeaderRaw.end() );
+
+        std::ofstream file( "D:\\fheroes2\\build\\x64\\Debug-SDL2\\data\\HEROES2X\\heroes.icn\\temp.icn", std::ios::binary );
+        file.write( reinterpret_cast<const char *>( result.data() ), result.size() );
+
+        return result;
+    }
+
+    // TODO cleanup the code
+    std::vector<uint8_t> AGGFile::getPixelsFromSurface( SDL_Surface * surface )
+    {
+        // Convert surface to RGBA format if necessary
+        SDL_Surface * convertedSurface = surface;
+        if ( surface->format->format != SDL_PIXELFORMAT_RGBA32 ) {
+            convertedSurface = SDL_ConvertSurfaceFormat( surface, SDL_PIXELFORMAT_RGBA32, 0 );
+            if ( convertedSurface == nullptr ) {
+                std::cerr << "Error: Unable to convert surface to RGBA format." << std::endl;
+                return {};
+            }
+        }
+
+        std::vector<uint8_t> pixels;
+        pixels.reserve( surface->w * surface->h * 4 ); // Pre-allocate memory for performance
+
+        SDL_LockSurface( convertedSurface );
+        uint8_t * pixelData = reinterpret_cast<uint8_t *>( convertedSurface->pixels );
+
+        for ( int y = 0; y < convertedSurface->h; ++y ) {
+            for ( int x = 0; x < convertedSurface->w; ++x ) {
+                uint8_t r = *pixelData++;
+                uint8_t g = *pixelData++;
+                uint8_t b = *pixelData++;
+                uint8_t a = *pixelData++;
+                pixels.push_back( r );
+                pixels.push_back( g );
+                pixels.push_back( b );
+                pixels.push_back( a );
+            }
+        }
+
+        SDL_UnlockSurface( convertedSurface );
+
+        if ( convertedSurface != surface ) {
+            SDL_FreeSurface( convertedSurface );
+        }
+
+        return pixels;
     }
 }
 

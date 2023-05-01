@@ -304,6 +304,31 @@ namespace fheroes2
 
         const uint8_t * dataEnd = data + sizeData;
 
+        // TODO clean up the code, clarify the ARGB vs RGBA issue, set a proper signature
+        if ( unsigned( data[0] ) == 0xAB && unsigned( data[1] ) == 0xCD && unsigned( data[2] ) == 0xEF) {
+            data = data + 3;
+            for ( ; data != dataEnd; ++imageData, ++imageTransform ) {
+
+                uint8_t b = *data++;
+                uint8_t g = *data++;
+                uint8_t r = *data++;
+                uint8_t a = *data++;
+                uint32_t rgba = 0;
+                rgba |= static_cast<uint32_t>( r );
+                rgba |= static_cast<uint32_t>( g ) << 8;
+                rgba |= static_cast<uint32_t>( b ) << 16;
+                rgba |= static_cast<uint32_t>( a ) << 24;
+                *imageData = rgba;
+                posX++;
+                if ( posX < 10 ) {
+                    COUT( "r:" << unsigned(r) << ", g:" << unsigned(g) << ", b:" << unsigned(b) << ", a:" << unsigned(a)  );
+                    COUT( "rgba" << unsigned(rgba) );
+                }
+                *imageTransform = 0;
+            }
+            return sprite;
+        }
+
         while ( true ) {
             if ( 0 == *data ) { // 0x00 - end of row
                 imageData += width;
