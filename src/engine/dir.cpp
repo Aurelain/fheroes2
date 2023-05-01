@@ -63,7 +63,7 @@ namespace
         return false;
     }
 
-    void getFilesFromDirectory( const std::string & path, const std::string & name, bool sensitive, bool nameAsFilter, ListFiles & files )
+    void getFilesFromDirectory( const std::string & path, const std::string & name, bool sensitive, bool nameAsFilter, ListFiles & files, bool allowDirs = false)
     {
 #if defined( _WIN32 )
         (void)sensitive;
@@ -78,7 +78,7 @@ namespace
 
         do {
             // Ignore any internal directories
-            if ( data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
+            if ( !allowDirs && data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
                 continue;
             }
 
@@ -106,7 +106,7 @@ namespace
             std::string fullname = System::concatPath( path, dir.d_name );
 
             // if not regular file
-            if ( !SCE_S_ISREG( dir.d_stat.st_mode ) )
+            if ( !allowDirs && !SCE_S_ISREG( dir.d_stat.st_mode ) )
                 continue;
 
             if ( filterByName( dir.d_name, nameAsFilter, name, strCmp ) )
@@ -135,7 +135,7 @@ namespace
             std::string fullname = System::concatPath( correctedPath, ep->d_name );
 
             // if not regular file
-            if ( !System::IsFile( fullname ) )
+            if ( !allowDirs  && !System::IsFile( fullname ) )
                 continue;
 
             if ( filterByName( ep->d_name, nameAsFilter, name, strCmp ) )
@@ -153,9 +153,9 @@ void ListFiles::Append( const ListFiles & files )
     insert( end(), files.begin(), files.end() );
 }
 
-void ListFiles::ReadDir( const std::string & path, const std::string & filter, bool sensitive )
+void ListFiles::ReadDir( const std::string & path, const std::string & filter, bool sensitive, bool allowDirs )
 {
-    getFilesFromDirectory( path, filter, sensitive, true, *this );
+    getFilesFromDirectory( path, filter, sensitive, true, *this, allowDirs );
 }
 
 void ListFiles::FindFileInDir( const std::string & path, const std::string & fileName, bool sensitive )
