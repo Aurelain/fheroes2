@@ -53,6 +53,10 @@ namespace fheroes2
 
         StreamFile _stream;
         std::map<std::string, std::pair<uint32_t, uint32_t>> _files;
+
+        std::map<std::string, std::pair<std::vector<uint8_t>, bool>> _externals;
+        bool collectExternals( const std::string & aggFileName );
+        std::vector<uint8_t> spawnIcnFromDir( const std::string & dirPath );
     };
 
     struct ICNHeader
